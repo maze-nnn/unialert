@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UniAlert</title>
+<style>
+body{
+    margin:0;
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg,#1e3c72,#2a5298);
+    color:white;
+    text-align:center;
+}
+.container{
+    max-width:500px;
+    margin:50px auto;
+    background:white;
+    color:black;
+    padding:25px;
+    border-radius:15px;
+    box-shadow:0 10px 25px rgba(0,0,0,0.3);
+}
+h1{
+    color:#2a5298;
+}
+button{
+    padding:10px 20px;
+    margin:10px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    background:#2a5298;
+    color:white;
+    font-size:14px;
+}
+button:hover{
+    background:#1e3c72;
+}
+input, select{
+    width:90%;
+    padding:8px;
+    margin:8px 0;
+    border-radius:6px;
+    border:1px solid #ccc;
+}
+.hidden{
+    display:none;
+}
+.notification{
+    background:#ffcc00;
+    padding:10px;
+    border-radius:8px;
+    margin:10px 0;
+}
+.table{
+    margin-top:15px;
+    border-collapse:collapse;
+    width:100%;
+}
+.table th,.table td{
+    border:1px solid #ddd;
+    padding:8px;
+}
+.table th{
+    background:#2a5298;
+    color:white;
+}
+</style>
+</head>
+<body>
+
+<div class="container" id="roleSelection">
+    <h1>UniAlert</h1>
+    <p>اختر نوع المستخدم</p>
+    <button onclick="selectRole('student')">طالب</button>
+    <button onclick="selectRole('doctor')">دكتور</button>
+    <button onclick="selectRole('assistant')">معيد</button>
+</div>
+
+<div class="container hidden" id="loginPage">
+    <h1>تسجيل الدخول</h1>
+    <select>
+        <option>اختر الجامعة</option>
+        <option>جامعة القاهرة</option>
+        <option>جامعة الإسكندرية</option>
+    </select>
+    <select>
+        <option>اختر الكلية</option>
+        <option>حاسبات ومعلومات</option>
+        <option>هندسة</option>
+    </select>
+    <input type="text" placeholder="ادخل ID الجامعي">
+    <button onclick="login()">دخول</button>
+</div>
+
+<div class="container hidden" id="studentDashboard">
+    <h1>جدول المحاضرات</h1>
+    <div class="notification" id="notify">لا يوجد تغييرات حالياً</div>
+    <table class="table">
+        <tr>
+            <th>المادة</th>
+            <th>اليوم</th>
+            <th>الوقت</th>
+            <th>المكان</th>
+        </tr>
+        <tr>
+            <td>Programming 2</td>
+            <td>الأحد</td>
+            <td id="lectureTime">10:00 AM</td>
+            <td id="lecturePlace">مدرج 1</td>
+        </tr>
+    </table>
+</div>
+
+<div class="container hidden" id="doctorDashboard">
+    <h1>لوحة تحكم الدكتور</h1>
+    <p>تعديل بيانات المحاضرة</p>
+    <input type="text" id="newTime" placeholder="الوقت الجديد">
+    <input type="text" id="newPlace" placeholder="المكان الجديد">
+    <button onclick="updateLecture()">تحديث</button>
+</div>
+
+<script>
+let currentRole="";
+
+function selectRole(role){
+    currentRole=role;
+    document.getElementById("roleSelection").classList.add("hidden");
+    document.getElementById("loginPage").classList.remove("hidden");
+}
+
+function login(){
+    document.getElementById("loginPage").classList.add("hidden");
+    if(currentRole==="student"){
+        document.getElementById("studentDashboard").classList.remove("hidden");
+    }else{
+        document.getElementById("doctorDashboard").classList.remove("hidden");
+    }
+}
+
+function updateLecture(){
+    let time=document.getElementById("newTime").value;
+    let place=document.getElementById("newPlace").value;
+
+    if(time){
+        document.getElementById("lectureTime").innerText=time;
+    }
+    if(place){
+        document.getElementById("lecturePlace").innerText=place;
+    }
+
+    alert("تم تحديث المحاضرة وإرسال إشعار للطلاب");
+}
+</script>
+
+</body>
+</html>
