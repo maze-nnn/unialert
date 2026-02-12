@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UniAlert - ECU</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
     <style>
         :root {
             --main-red: #c0392b;
@@ -18,7 +22,7 @@
             overflow-x: hidden;
         }
 
-        /* Splash Screen - شاشة البداية */
+        /* Splash Screen */
         #welcomeScreen {
             position: fixed;
             top: 0; left: 0;
@@ -101,15 +105,22 @@
 
         th { background: var(--main-red); color: white; }
 
-        .footer-logo { width: 80px; margin-top: 20px; }
+        /* Admin Section Styling */
+        #adminPanel {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 2px dashed #ccc;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
 
 <div id="welcomeScreen">
-    <img src="logo.png" id="mainLogo" alt="University Logo">
+    <img src="unialert-main/logo.png" id="mainLogo" alt="University Logo">
     <h2 style="color: var(--main-red);">Welcome to ECU Portal</h2>
-    <p>Loading Schedule System...</p>
+    <p>Connecting to Firebase Realtime Database...</p>
 </div>
 
 <div class="container hidden" id="rolePage">
@@ -132,11 +143,11 @@
     <input type="email" id="emailInput" placeholder="name@ecu.edu.eg">
     <input type="password" placeholder="Password">
     <button onclick="handleLogin()">Sign In</button>
-    <p style="font-size: 12px;">Must use @ecu.edu.eg email</p>
+    <p style="font-size: 12px;">Use any email starting with 'ta' for Admin Access</p>
 </div>
 
 <div class="container hidden" id="dashboard">
-    <h1>Academic Schedule</h1>
+    <h1 id="dashboardTitle">Academic Schedule</h1>
     <div id="alertBox" class="notif-bar">Status: No updates for today.</div>
     <table>
         <thead>
@@ -148,18 +159,41 @@
         <tbody id="schedule">
             </tbody>
     </table>
-    <button style="background:#555; font-size:12px; margin-top:30px;" onclick="simulateUpdate()">Simulate Schedule Change</button>
+
+    <div id="adminPanel" class="hidden">
+        <h3 style="color: #333;">TA Control Panel</h3>
+        <p style="font-size: 13px;">Update "General Biology" time for everyone:</p>
+        <input type="text" id="newTimeInput" placeholder="Ex: 10:30 AM or Hall C">
+        <button style="background: #2c3e50;" onclick="updateScheduleOnFirebase()">Push Update to All</button>
+    </div>
 </div>
 
 <script>
-    // 1. التحكم في شاشة البداية
+    // 1. إعدادات Firebase الخاصة بك
+    const firebaseConfig = {
+        apiKey: "AIzaSyDx8U4_pYqLAKtdV5jCBqFk9sOKb9Jq_RQ",
+        authDomain: "unialert-6e165.firebaseapp.com",
+        projectId: "unialert-6e165",
+        storageBucket: "unialert-6e165.firebasestorage.app",
+        messagingSenderId: "771160764482",
+        appId: "1:771160764482:web:30796a4cf47579e9b33ddb",
+        measurementId: "G-MVNJS6DJWK"
+    };
+
+    // تشغيل Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // 2. التحكم في شاشة البداية
     window.onload = () => {
         setTimeout(() => {
             const screen = document.getElementById('welcomeScreen');
             screen.style.opacity = '0';
-            screen.style.visibility = 'hidden'; // عشان الزرار يدوس
-            document.getElementById('rolePage').classList.remove('hidden');
-        }, 3000); // 3 ثواني
+            setTimeout(() => {
+                screen.style.visibility = 'hidden';
+                document.getElementById('rolePage').classList.remove('hidden');
+            }, 800);
+        }, 3000);
     };
 
     let userFaculty = "";
@@ -176,39 +210,66 @@
         document.getElementById('facultyTitle').innerText = faculty;
     }
 
+    // 3. نظام تسجيل الدخول مع التمييز بين الطالب والمعيد
     function handleLogin() {
-        const email = document.getElementById('emailInput').value;
-        if(email.toLowerCase().endsWith("@ecu.edu.eg")) {
+        const email = document.getElementById('emailInput').value.toLowerCase();
+        
+        if(email.endsWith("@ecu.edu.eg")) {
             document.getElementById('loginPage').classList.add('hidden');
             document.getElementById('dashboard').classList.remove('hidden');
-            renderSchedule();
+
+            // التمييز: إذا كان الإيميل يبدأ بـ ta يعتبر معيد
+            if(email.startsWith("ta") || email.startsWith("admin")) {
+                document.getElementById('adminPanel').classList.remove('hidden');
+                document.getElementById('dashboardTitle').innerText = "TA Dashboard";
+            }
+
+            startRealtimeListener(); // بدء استقبال البيانات الحقيقية
         } else {
-            alert("Error: Access denied. Please use your official @ecu.edu.eg email.");
+            alert("Error: Please use your official @ecu.edu.eg email.");
         }
     }
 
-    function renderSchedule() {
-        const list = [
-            { name: "General Biology", time: "09:00 AM" },
-            { name: "Academic Writing", time: "11:30 AM" },
-            { name: "Intro to Faculty", time: "02:00 PM" }
-        ];
-        const tbody = document.getElementById('schedule');
-        tbody.innerHTML = list.map(item => `
-            <tr>
-                <td>${item.name}</td>
-                <td>${item.time}</td>
-            </tr>
-        `).join('');
+    // 4. الربط الحقيقي مع Firebase (لسماع التحديثات)
+    function startRealtimeListener() {
+        const scheduleRef = database.ref('ecu_data/schedule');
+        
+        scheduleRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if(data) {
+                renderSchedule(data);
+                // إظهار تنبيه عند حدوث أي تغيير
+                const alertBox = document.getElementById('alertBox');
+                alertBox.innerText = "⚠️ Schedule was updated by faculty!";
+                alertBox.style.background = "#c0392b";
+                alertBox.style.color = "white";
+            }
+        });
     }
 
-    function simulateUpdate() {
-        const alertBox = document.getElementById('alertBox');
-        alertBox.innerText = "⚠️ ATTENTION: Your 11:30 AM class moved to Hall B!";
-        alertBox.style.background = "#c0392b";
-        alertBox.style.color = "white";
-        // حفظ التنبيه
-        localStorage.setItem('ecu_update', alertBox.innerText);
+    function renderSchedule(data) {
+        const tbody = document.getElementById('schedule');
+        // البيانات الآن تأتي من Firebase مباشرة
+        tbody.innerHTML = `
+            <tr><td>General Biology</td><td>${data.biologyTime || "09:00 AM"}</td></tr>
+            <tr><td>Academic Writing</td><td>${data.writingTime || "11:30 AM"}</td></tr>
+            <tr><td>Intro to Faculty</td><td>02:00 PM</td></tr>
+        `;
+    }
+
+    // 5. وظيفة المعيد لتحديث البيانات للكل
+    function updateScheduleOnFirebase() {
+        const newTime = document.getElementById('newTimeInput').value;
+        if(newTime === "") return alert("Please enter the new time/update.");
+
+        database.ref('ecu_data/schedule').update({
+            biologyTime: newTime
+        }).then(() => {
+            alert("Update successful! All students will see it now.");
+            document.getElementById('newTimeInput').value = "";
+        }).catch((error) => {
+            alert("Firebase Error: Make sure Rules are set to true. " + error.message);
+        });
     }
 </script>
 
